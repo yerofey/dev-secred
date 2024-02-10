@@ -1,64 +1,52 @@
 <template>
   <main class="sm:w-full md:w-[400px] lg:w-[500px] mx-auto">
-    <button
-      v-if="!userAddress"
-      @click="connectWalletAndSwitchNetwork"
-      class="bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700"
-    >
+    <UButton v-if="!userAddress" @click="connectWalletAndSwitchNetwork">
       Connect Wallet
-    </button>
+    </UButton>
     <div v-else>
       <div class="py-2">
         Wallet: <span class="text-gray-500">{{ userAddress }}</span>
       </div>
       <form @submit.prevent="submitNote">
-        <textarea
-          type="text"
+        <UTextarea
           v-model="noteContent"
           placeholder="Enter your secret note"
-          class="border-2 border-gray-300 p-2 rounded d-block w-full"
-        ></textarea>
+        ></UTextarea>
         <br />
         <div class="flex items-center justify-between">
-          <button
+          <UButton
             type="submit"
             @click="submitNote"
-            :disabled="submittingNote || !noteContent"
-            class="bg-blue-500 text-white font-bold py-2 px-4 rounded :not(disabled):hover:bg-blue-700"
-            :class="{ 'opacity-50': submittingNote || !noteContent }"
+            :disabled="isSubmitting || !noteContent"
+            size="lg"
           >
-            Submit
-          </button>
-          <span v-if="submittingNote && !txId" class="ml-4 text-gray-500"
-            >Submitting...</span
-          >
-          <span v-if="submittingNote && txId" class="ml-4 text-gray-500">
+            {{ isSubmitting ? 'Submitting...' : 'Submit' }}
+          </UButton>
+          <span v-if="!isSubmitting && txId" class="ml-4 text-gray-500 text-sm">
             Pending TX:
             <a :href="`${explorerUrl}/tx/${txId}`" target="_blank">{{
               shortenTxHash(txId)
             }}</a>
           </span>
-          <span v-if="!submittingNote" class="ml-4 text-gray-400">
-            Cost: ${{ deployPriceUSD }} ≈
-            {{ parseFloat(deployPriceETH).toFixed(6) }} ETH + gas fee
+          <span v-if="!isSubmitting" class="ml-4 text-gray-400">
+            Cost: ${{ deployPriceUSD }}
+            <!-- ≈ {{ parseFloat(deployPriceETH).toFixed(6) }} ETH + gas fee -->
           </span>
         </div>
       </form>
-      <!-- <div v-if="txId">
-        Transaction ID:
-        <a :href="`${explorerUrl}/tx/${txId}`" target="_blank">{{ txId }}</a>
-      </div> -->
       <div v-if="userTransactions.length > 0" class="mt-8">
         <div
           v-for="tx in userTransactions"
           :key="tx.hash"
-          class="mb-6 p-2 rounded-lg border border-gray-100 shadow bg-white"
+          class="mb-6 p-2 rounded-lg dark:bg-gray-800 shadow"
         >
           <p class="px-2 text-gray-400">
             <span>{{ formatDate(tx.timeStamp) }}</span>
           </p>
           <div class="text-gray-700 my-2">
-            <p class="bg-gray-100 p-4 rounded text-lg">
+            <p
+              class="bg-gray-100 dark:bg-gray-700 dark:text-gray-100 p-4 rounded-lg text-lg"
+            >
               {{ tx.decryptedContent }}
             </p>
           </div>
@@ -81,42 +69,43 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { EventEmitter } from 'events';
-window.EventEmitter = EventEmitter;
 import Web3 from 'web3';
 import { nanoid } from 'nanoid';
 import { keccak256, sha3_256 } from 'js-sha3';
 import CryptoJS from 'crypto-js';
 import bigInt from 'big-integer';
-import contractABI from './contractABI.json';
+import contractABI from '~/assets/contractABI.json';
 
-const explorerUrl = import.meta.env.VITE_APP_EXPLORER_URL;
-const contractAddress = import.meta.env.VITE_APP_CONTRACT_ADDRESS;
-const startBlock = import.meta.env.VITE_APP_START_BLOCK;
+const config = useRuntimeConfig();
+const explorerUrl = config.public.explorerUrl;
+const contractAddress = config.public.contractAddress;
+const chainId = config.public.chainId;
+const chainName = config.public.chainName;
+const rpcUrl = config.public.rpcUrl;
+const startBlock = config.public.startBlock;
+const additionFee = config.public.additionFee;
 const networkParams = {
-  chainId: import.meta.env.VITE_APP_CHAIN_ID,
-  chainName: import.meta.env.VITE_APP_CHAIN_NAME,
+  chainId: chainId,
+  chainName: chainName,
   nativeCurrency: {
     name: 'ETH',
     symbol: 'ETH',
     decimals: 18,
   },
-  rpcUrls: [import.meta.env.VITE_APP_RPC_URL],
+  rpcUrls: [rpcUrl],
   blockExplorerUrls: [explorerUrl],
 };
-const etherscanApiKey = import.meta.env.VITE_APP_ETHERSCAN_API_KEY;
 
 let web3, contract;
 const userAddress = ref('');
 const encryptionKey = ref('');
 const noteContent = ref('');
-const submittingNote = ref(false);
+const isSubmitting = ref(false);
 const txId = ref('');
 const userTransactions = ref([]);
 
 let deployPriceUSD = 0.5;
-let deployPriceETH = import.meta.env.VITE_APP_ADDITION_FEE_ETH;
+let deployPriceETH = additionFee;
 let ethPriceUSD = 2500;
 
 const connectWalletAndSwitchNetwork = async () => {
@@ -148,7 +137,7 @@ const switchNetwork = async () => {
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: networkParams.chainId }],
+      params: [{ chainId: chainId }],
     });
   } catch (error) {
     console.error(error);
@@ -229,7 +218,7 @@ const submitNote = async () => {
     return;
   }
 
-  submittingNote.value = true;
+  isSubmitting.value = true;
 
   const noteId = nanoid(); // Generate a unique note ID
   const noteIdHash = await hashNoteId(noteId);
@@ -262,24 +251,21 @@ const submitNote = async () => {
 
     // Clear the note content after submission
     noteContent.value = '';
+    txId.value = '';
   } catch (error) {
     console.error(error);
   }
 
-  submittingNote.value = false;
+  isSubmitting.value = false;
 };
 
 const fetchTransactions = async () => {
-  const url = `${
-    import.meta.env.VITE_APP_ETHERSCAN_API_URL
-  }?module=account&action=txlist&address=${
-    userAddress.value
-  }&startblock=${startBlock}&endblock=999999999&sort=desc&apikey=${etherscanApiKey}`;
-  const response = await fetch(url);
-  const data = await response.json();
-
-  if (data.result) {
-    const decryptedTransactions = data.result
+  const { data } = await useLazyFetch(
+    `/api/transactions?address=${userAddress.value}&startblock=${startBlock}&endblock=999999999&sort=desc`
+  );
+  const transactions = data?.value?.result || [];
+  if (transactions) {
+    const decryptedTransactions = transactions
       .filter((tx) => tx.to.toLowerCase() === contractAddress.toLowerCase())
       .map((tx) => {
         const encryptedContent = decodeTransactionInput(tx.input);
@@ -297,21 +283,13 @@ const fetchTransactions = async () => {
   }
 };
 
-// const fetchNoteAdditionFee = async () => {
-//   try {
-//     const fee = await contract.methods.getNoteAdditionFee();
-//     console.log('Note Addition Fee:', web3.utils.fromWei(fee, 'ether'), 'ETH');
-//   } catch (error) {
-//     console.error('Error fetching note addition fee:', error);
-//   }
-// };
-
 const fetchETHPrice = async () => {
-  const response = await fetch(
-    'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
-  );
-  const data = await response.json();
-  return data.ethereum.usd;
+  try {
+    const { data } = await useFetch('/api/price?coin=ethereum');
+    return data.value;
+  } catch (error) {
+    console.error('Error fetching ETH price:', error);
+  }
 };
 
 // const calculateETHForFixedUSD = (fixedUSD = 0.5) =>
@@ -339,7 +317,8 @@ onMounted(async () => {
   }
 
   // Fetch ETH price and calculate deploy price in USD
-  ethPriceUSD = await fetchETHPrice();
+  ethPriceUSD = parseFloat(await fetchETHPrice());
+  console.log('ETH Price:', ethPriceUSD);
   deployPriceUSD = (ethPriceUSD * deployPriceETH).toFixed(2);
 });
 </script>
