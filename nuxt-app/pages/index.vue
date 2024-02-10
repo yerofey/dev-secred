@@ -30,7 +30,9 @@
         <form @submit.prevent="submitNote">
           <UTextarea
             v-model="noteContent"
-            placeholder="Enter your secret note"
+            placeholder="Insert the content you want to secure"
+            rows="4"
+            size="lg"
           ></UTextarea>
           <div class="flex items-center justify-between mt-2">
             <UButton
