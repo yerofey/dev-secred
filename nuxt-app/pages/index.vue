@@ -5,40 +5,58 @@
     </UButton>
     <div v-else>
       <div class="py-2">
-        Wallet:
-        <span class="text-gray-500">
-          <a :href="`${explorerUrl}/address/${userAddress}`" target="_blank">{{
-            userAddress
-          }}</a>
-        </span>
-      </div>
-      <form @submit.prevent="submitNote">
-        <UTextarea
-          v-model="noteContent"
-          placeholder="Enter your secret note"
-        ></UTextarea>
-        <br />
-        <div class="flex items-center justify-between">
-          <UButton
-            type="submit"
-            @click="submitNote"
-            :disabled="isSubmitting || !noteContent"
-            size="lg"
-          >
-            {{ isSubmitting ? 'Submitting...' : 'Submit' }}
-          </UButton>
-          <span v-if="!isSubmitting && txId" class="ml-4 text-gray-500 text-sm">
-            Pending TX:
-            <a :href="`${explorerUrl}/tx/${txId}`" target="_blank">{{
-              shortenTxHash(txId)
-            }}</a>
-          </span>
-          <span v-if="!isSubmitting" class="ml-4 text-gray-400">
-            Cost: ${{ deployPriceUSD }}
-            <!-- ≈ {{ parseFloat(deployPriceETH).toFixed(6) }} ETH + gas fee -->
-          </span>
+        <div class="mb-2 flex items-center justify-between">
+          <div>
+            Wallet:
+            <span class="text-gray-500">
+              <a
+                :href="`${explorerUrl}/address/${userAddress}`"
+                target="_blank"
+                >{{ shortenTxHash(userAddress) }}</a
+              >
+            </span>
+          </div>
+          <div>
+            Contract:
+            <span class="text-gray-500">
+              <a
+                :href="`${explorerUrl}/address/${contractAddress}`"
+                target="_blank"
+                >{{ shortenTxHash(contractAddress) }}</a
+              >
+            </span>
+          </div>
         </div>
-      </form>
+        <form @submit.prevent="submitNote">
+          <UTextarea
+            v-model="noteContent"
+            placeholder="Enter your secret note"
+          ></UTextarea>
+          <div class="flex items-center justify-between mt-2">
+            <UButton
+              type="submit"
+              @click="submitNote"
+              :disabled="isSubmitting || !noteContent"
+              size="lg"
+            >
+              {{ isSubmitting ? 'Submitting...' : 'Submit' }}
+            </UButton>
+            <span
+              v-if="!isSubmitting && txId"
+              class="ml-4 text-gray-500 text-sm"
+            >
+              Pending TX:
+              <a :href="`${explorerUrl}/tx/${txId}`" target="_blank">{{
+                shortenTxHash(txId)
+              }}</a>
+            </span>
+            <span v-if="!isSubmitting" class="ml-4 text-gray-400">
+              Cost: ${{ parseFloat(deployPriceUSD).toFixed(2) }}
+              <!-- ≈ {{ parseFloat(deployPriceETH).toFixed(6) }} ETH + gas fee -->
+            </span>
+          </div>
+        </form>
+      </div>
       <div v-if="userTransactions.length > 0" class="mt-8">
         <div
           v-for="tx in userTransactions"
@@ -59,7 +77,7 @@
             <span> {{ parseFloat(tx.valueInEth).toFixed(6) }} ETH</span>
             <span class="float-right">
               <a
-                :href="`${explorerUrl}/tx/${txId}`"
+                :href="`${explorerUrl}/tx/${tx.hash}`"
                 target="_blank"
                 class="hover:underline"
               >
@@ -170,10 +188,10 @@ const deriveEncryptionKey = (address) => {
   return keccak256(address);
 };
 
-const shortenTxHash = (txHash) => {
+const shortenTxHash = (txHash, startCut = 6, endCut = 4) => {
   if (txHash && txHash.length > 10) {
-    const start = txHash.substring(0, 6);
-    const end = txHash.substring(txHash.length - 6);
+    const start = txHash.substring(0, startCut);
+    const end = txHash.substring(txHash.length - endCut);
     return `${start}...${end}`;
   }
   return txHash;
