@@ -3,12 +3,11 @@ export default defineNuxtConfig({
     app: {
         head: {
             charset: 'utf-8',
-            viewport: 'width=device-width, initial-scale=1',
+            viewport: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no',
         },
         title: 'Secred (web3)'
     },
     ssr: true,
-    devtools: { enabled: true },
     runtimeConfig: {
         public: {
             etherscanApiUrl: process.env.NUXT_PUBLIC_ETHERSCAN_API_URL,
@@ -27,5 +26,9 @@ export default defineNuxtConfig({
     ui: {
         global: true,
         icons: 'all',
-    }
+    },
+    colorMode: {
+        preference: 'dark',
+    },
+    // devtools: { enabled: true },
 })
