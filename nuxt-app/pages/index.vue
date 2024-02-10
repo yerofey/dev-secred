@@ -71,7 +71,8 @@
 <script setup>
 import Web3 from 'web3';
 import { nanoid } from 'nanoid';
-import { keccak256, sha3_256 } from 'js-sha3';
+import jsSha3 from 'js-sha3';
+const { keccak256, sha3_256 } = jsSha3;
 import CryptoJS from 'crypto-js';
 import bigInt from 'big-integer';
 import contractABI from '~/assets/contractABI.json';
