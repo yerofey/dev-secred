@@ -107,6 +107,10 @@ contract SecretNotes {
         return noteEarnings[noteId];
     }
 
+    function getShareIDs(string memory noteId) public view onlyNoteOwner(noteId) returns (string[] memory) {
+        return notes[noteId].shareIDs;
+    }
+
     function setNoteAccessFee(string memory noteId, uint256 _accessFee) public {
         require(msg.sender == notes[noteId].owner, "Only the note owner can set the access fee");
         notes[noteId].accessFee = _accessFee;

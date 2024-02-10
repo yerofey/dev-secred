@@ -3,7 +3,7 @@ import contractABI from '../artifacts/contracts/SecretNotes.sol/SecretNotes.json
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
-  const contractAddress = '0x538d7739d68C98314b8053Eb13626E2183a3381B';
+  const contractAddress = '0x88b2aF32929F41Ae2Fc10ebd0e4ae9ab3178Dd3f';
   // Create a new contract instance with signer that has the ability to sign transactions
   const secretNotesContract = new ethers.Contract(
     contractAddress,
