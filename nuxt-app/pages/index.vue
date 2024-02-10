@@ -147,18 +147,13 @@ const switchNetwork = async () => {
       params: [{ chainId: chainId }],
     });
   } catch (error) {
-    if (error.code === 4902) {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [networkParams],
-        });
-      } catch (addError) {
-        console.error(addError);
-      }
-    } else {
-      // Handle other errors
-      console.error(error);
+    try {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [networkParams],
+      });
+    } catch (addError) {
+      console.error(addError);
     }
   }
 };
