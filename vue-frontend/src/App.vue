@@ -82,6 +82,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { EventEmitter } from 'events';
+window.EventEmitter = EventEmitter;
 import Web3 from 'web3';
 import { nanoid } from 'nanoid';
 import { keccak256, sha3_256 } from 'js-sha3';
@@ -115,7 +117,7 @@ const userTransactions = ref([]);
 
 let deployPriceUSD = 0.5;
 let deployPriceETH = import.meta.env.VITE_APP_ADDITION_FEE_ETH;
-let ethPriceUSD = 0;
+let ethPriceUSD = 2500;
 
 const connectWalletAndSwitchNetwork = async () => {
   await connectWallet();
