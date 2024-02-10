@@ -115,33 +115,51 @@ const connectWalletAndSwitchNetwork = async () => {
 };
 
 const connectWallet = async () => {
-  if (window.ethereum) {
-    // Request account access
-    try {
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts',
-      });
-      userAddress.value = accounts[0];
-
-      // After successfully connecting, derive the encryption key
-      encryptionKey.value = deriveEncryptionKey(userAddress.value);
-      // console.log('Encryption Key:', encryptionKey.value);
-    } catch (error) {
-      console.error(error);
-    }
-  } else {
+  if (typeof window.ethereum === 'undefined') {
     console.error('No wallet detected');
+    return;
+  }
+
+  // Request account access
+  try {
+    const accounts = await window.ethereum.request({
+      method: 'eth_requestAccounts',
+    });
+    userAddress.value = accounts[0];
+
+    // After successfully connecting, derive the encryption key
+    encryptionKey.value = deriveEncryptionKey(userAddress.value);
+    // console.log('Encryption Key:', encryptionKey.value);
+  } catch (error) {
+    console.error(error);
   }
 };
 
 const switchNetwork = async () => {
+  if (typeof window.ethereum === 'undefined') {
+    console.error('No wallet detected');
+    return;
+  }
+
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: chainId }],
     });
   } catch (error) {
-    console.error(error);
+    if (error.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [networkParams],
+        });
+      } catch (addError) {
+        console.error(addError);
+      }
+    } else {
+      // Handle other errors
+      console.error(error);
+    }
   }
 };
 
