@@ -5,7 +5,12 @@
     </UButton>
     <div v-else>
       <div class="py-2">
-        Wallet: <span class="text-gray-500">{{ userAddress }}</span>
+        Wallet:
+        <span class="text-gray-500">
+          <a :href="`${explorerUrl}/address/${userAddress}`" target="_blank">{{
+            userAddress
+          }}</a>
+        </span>
       </div>
       <form @submit.prevent="submitNote">
         <UTextarea
@@ -93,7 +98,9 @@ const networkParams = {
     symbol: 'ETH',
     decimals: 18,
   },
-  iconUrls: ['https://sepolia-optimism.etherscan.io/images/logo-ether.svg?v=0.0.6'],
+  iconUrls: [
+    'https://sepolia-optimism.etherscan.io/images/logo-ether.svg?v=0.0.6',
+  ],
   rpcUrls: [rpcUrl],
   blockExplorerUrls: [explorerUrl],
 };
