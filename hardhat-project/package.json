@@ -6,8 +6,8 @@
 	"type": "module",
 	"scripts": {
     "hardhat:compile": "hardhat compile",
-    "hardhat:deploy": "hardhat run scripts/deploy.js --network optimism_sepolia",
-    "hardhat:withdraw": "hardhat run scripts/withdraw.js --network optimism_sepolia",
+    "hardhat:deploy": "hardhat run scripts/deploy.js --network arbitrum_sepolia",
+    "hardhat:withdraw": "hardhat run scripts/withdraw.js --network arbitrum_sepolia",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"keywords": [],

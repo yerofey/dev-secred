@@ -11,6 +11,7 @@ contract SecretNotes {
         mapping(string => ShareInfo) shares;
         string[] shareIDs;
         uint256 accessFee;
+        uint256 createdTimestamp;
     }
 
     struct ShareInfo {
@@ -19,11 +20,13 @@ contract SecretNotes {
     }
 
     mapping(string => Note) private notes;
+    mapping(address => string[]) private ownerNoteIds;
     mapping(string => address) private noteOwners;
     mapping(string => uint256) private noteEarnings;
     mapping(string => string) private noteIDByShareID;
 
-    event NoteAdded(string indexed noteId, address indexed owner);
+    event NoteAdded(string indexed noteId, address indexed owner, uint256 fee, uint256 timestamp);
+    event NoteAdditionFeeUpdated(uint256 newFee);
     event NoteAccessed(string indexed noteId, address indexed requester);
     event NoteAccessFeeUpdated(string indexed noteId, uint256 newFee);
     event ShareIDAdded(string indexed noteId, string shareId, uint256 expirityTime);
@@ -34,6 +37,8 @@ contract SecretNotes {
     constructor(uint256 _noteAdditionFee) {
         owner = payable(msg.sender);
         noteAdditionFee = _noteAdditionFee;
+
+        emit NoteAdditionFeeUpdated(_noteAdditionFee);
     }
 
     modifier onlyOwner() {
@@ -55,8 +60,11 @@ contract SecretNotes {
         Note storage newNote = notes[noteId];
         newNote.encryptedNote = encryptedNote;
         newNote.owner = msg.sender;
+        newNote.createdTimestamp = block.timestamp;
 
-        emit NoteAdded(noteId, msg.sender);
+        ownerNoteIds[msg.sender].push(noteId);
+
+        emit NoteAdded(noteId, msg.sender, msg.value, block.timestamp);
     }
 
     function addShareID(string memory noteId, string memory shareId, string memory encryptedContentForShare, uint256 expiryDuration) public payable onlyNoteOwner(noteId) {
@@ -82,7 +90,12 @@ contract SecretNotes {
         emit ShareIDExtended(noteId, shareId, notes[noteId].shares[shareId].expirityTime);
     }
 
-    function getNote(string memory shareId) public payable {
+    function getNoteById(string memory noteId) public view returns (string memory, uint256) {
+        Note storage note = notes[noteId];
+        return (note.encryptedNote, note.createdTimestamp);
+    }
+
+    function getNoteByShareId(string memory shareId) public payable {
         string memory noteId = noteIDByShareID[shareId];
         require(bytes(noteId).length > 0, "Invalid shareId");
 
@@ -111,6 +124,10 @@ contract SecretNotes {
         return notes[noteId].shareIDs;
     }
 
+    function getOwnNotesIds() public view returns (string[] memory) {
+        return ownerNoteIds[msg.sender];
+    }
+
     function setNoteAccessFee(string memory noteId, uint256 _accessFee) public {
         require(msg.sender == notes[noteId].owner, "Only the note owner can set the access fee");
         notes[noteId].accessFee = _accessFee;
@@ -119,6 +136,7 @@ contract SecretNotes {
 
     function updateNoteAdditionFee(uint256 _newFee) public onlyOwner {
         noteAdditionFee = _newFee;
+        emit NoteAdditionFeeUpdated(_newFee);
     }
 
     function withdrawNoteEarnings(string memory noteId) public {
