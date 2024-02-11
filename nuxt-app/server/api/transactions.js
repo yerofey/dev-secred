@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const url = `${config.public.etherscanApiUrl}?module=account&action=txlist&address=${userAddress}&startblock=${startBlock}&endblock=${endBlock}&sort=${sort}&apikey=${config.public.etherscanApiKey}`; // TODO: use private API key
+    const url = `${config.public.scanApiUrl}?module=account&action=txlist&address=${userAddress}&startblock=${startBlock}&endblock=${endBlock}&sort=${sort}&apikey=${config.public.scanApiKey}`; // TODO: use private API key
     const response = await $fetch(url);
     // Optionally, filter or modify the response as needed before sending it to the client
     return response; // Return the fetched data directly or process it as needed

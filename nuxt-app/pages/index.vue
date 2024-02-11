@@ -31,7 +31,6 @@
           <UTextarea
             v-model="noteContent"
             placeholder="Insert the content you want to secure"
-            rows="4"
             size="lg"
           ></UTextarea>
           <div class="flex items-center justify-between mt-2">
@@ -53,8 +52,8 @@
               }}</a>
             </span>
             <span v-if="!isSubmitting" class="ml-4 text-gray-400">
-              Cost: ${{ parseFloat(deployPriceUSD).toFixed(2) }}
-              <!-- ≈ {{ parseFloat(deployPriceETH).toFixed(6) }} ETH + gas fee -->
+              <!-- Cost: ${{ parseFloat(deployPriceUSD).toFixed(2) }} + gas fee -->
+              Cost: {{ parseFloat(deployPriceETH).toFixed(4) }} ETH + gas fee
             </span>
           </div>
         </form>
@@ -76,7 +75,7 @@
             </p>
           </div>
           <p class="text-gray-400 px-2">
-            <span> {{ parseFloat(tx.valueInEth).toFixed(6) }} ETH</span>
+            <span> {{ parseFloat(tx.valueInEth).toFixed(4) }} ETH</span>
             <span class="float-right">
               <a
                 :href="`${explorerUrl}/tx/${tx.hash}`"
@@ -107,6 +106,7 @@ const explorerUrl = config.public.explorerUrl;
 const contractAddress = config.public.contractAddress;
 const chainId = config.public.chainId;
 const chainName = config.public.chainName;
+const chainIcon = config.public.chainIcon;
 const rpcUrl = config.public.rpcUrl;
 const startBlock = config.public.startBlock;
 const additionFee = config.public.additionFee;
@@ -118,9 +118,7 @@ const networkParams = {
     symbol: 'ETH',
     decimals: 18,
   },
-  iconUrls: [
-    'https://sepolia-optimism.etherscan.io/images/logo-ether.svg?v=0.0.6',
-  ],
+  iconUrls: [chainIcon],
   rpcUrls: [rpcUrl],
   blockExplorerUrls: [explorerUrl],
 };
@@ -132,6 +130,9 @@ const noteContent = ref('');
 const isSubmitting = ref(false);
 const txId = ref('');
 const userTransactions = ref([]);
+
+const isModalOpen = ref(false);
+const selectedTxId = ref('');
 
 let deployPriceUSD = 0.5;
 let deployPriceETH = additionFee;
@@ -301,6 +302,96 @@ const submitNote = async () => {
   isSubmitting.value = false;
 };
 
+const getOwnNotes = async () => {
+  try {
+    const noteIds = await contract.methods
+      .getOwnNotesIds()
+      .call({ from: userAddress.value });
+    console.log('Owned note IDs:', noteIds);
+    return noteIds;
+  } catch (error) {
+    console.error('Error fetching owned note IDs:', error);
+  }
+};
+
+const fetchOwnedNotesDetails = async () => {
+  if (!userAddress.value) {
+    console.error('User address not found');
+    return;
+  }
+
+  try {
+    const noteIds = await contract.methods
+      .getOwnNotesIds()
+      .call({ from: userAddress.value });
+
+    const notesPromises = noteIds.map(async (noteId) => {
+      const encryptedNote = await contract.methods
+        .getNoteById(noteId)
+        .call({ from: userAddress.value });
+
+      return {
+        id: noteId,
+        decryptedContent: decryptNote(encryptedNote, encryptionKey.value),
+        timeStamp: Date.now() / 1000,
+        valueInEth: additionFee,
+      };
+    });
+
+    const fetchedNotes = await Promise.all(notesPromises);
+    userTransactions.value = fetchedNotes.map((note) => ({
+      ...note,
+      hash: note.id, // Using note ID as a placeholder for transaction hash
+    }));
+  } catch (error) {
+    console.error('Error fetching owned notes details:', error);
+  }
+};
+
+const fetchOwnNotes = async () => {
+  try {
+    const events = await contract.getPastEvents('NoteAdded', {
+      filter: { owner: userAddress.value },
+      fromBlock: startBlock,
+      toBlock: 'latest',
+    });
+
+    const notes = await Promise.all(
+      events.map(async (event) => {
+        const { noteId, fee, timestamp } = event.returnValues;
+        console.log('Note ID:', noteId, 'Fee:', fee, 'Timestamp:', timestamp);
+
+        const noteData = await contract.methods
+          .getNoteById(noteId)
+          .call({ from: userAddress.value });
+        console.log(noteData); // Ensure this logs the expected structure
+
+        const encryptedNote = noteData[0];
+        const noteTimestamp = noteData[1];
+
+        const valueInEth = web3.utils.fromWei(fee.toString(), 'ether');
+        const isoTimestamp = new Date(noteTimestamp * 1000).toISOString();
+
+        const decryptedContent = decryptNote(
+          encryptedNote,
+          encryptionKey.value
+        );
+
+        return {
+          id: noteId,
+          decryptedContent,
+          timeStamp: noteTimestamp,
+          valueInEth,
+        };
+      })
+    );
+
+    userTransactions.value = notes;
+  } catch (error) {
+    console.error('Error fetching notes:', error);
+  }
+};
+
 const fetchTransactions = async () => {
   const { data } = await useLazyFetch(
     `/api/transactions?address=${userAddress.value}&startblock=${startBlock}&endblock=999999999&sort=desc`
@@ -354,8 +445,10 @@ onMounted(async () => {
   // Fetch transactions if user is connected
   if (userAddress.value) {
     await switchNetwork();
-    await fetchTransactions();
-    // await fetchNoteAdditionFee();
+    // fetchOwnedNotesDetails();
+    fetchTransactions();
+    // await getOwnNotes();
+    // fetchOwnNotes();
   }
 
   // Fetch ETH price and calculate deploy price in USD
