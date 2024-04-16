@@ -79,7 +79,7 @@
           </div>
         </div>
         <div v-else class="text-gray-500 text-center mt-8">
-          You have no notes yet.
+          You don't have any notes yet
         </div>
       </div>
     </div>
