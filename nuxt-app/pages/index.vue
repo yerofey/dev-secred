@@ -51,41 +51,35 @@
                 shortenTxHash(txId)
               }}</a>
             </span>
-            <span v-if="!isSubmitting" class="ml-4 text-gray-400">
-              <!-- Cost: ${{ parseFloat(deployPriceUSD).toFixed(2) }} + gas fee -->
-              Cost: {{ parseFloat(deployPriceETH).toFixed(4) }} ETH + gas fee
+            <span v-if="!isSubmitting" class="ml-4 text-gray-400 text-sm">
+              ≈${{ parseFloat(deployPriceUSD).toFixed(2) }}
             </span>
           </div>
         </form>
       </div>
-      <div v-if="userTransactions.length > 0" class="mt-8">
+      <div v-if="isLoading" class="flex items-center justify-center">
+        <Loader />
+      </div>
+      <div v-if="!isLoading" class="mt-8">
         <div
-          v-for="tx in userTransactions"
-          :key="tx.hash"
+          v-if="userNotes.length > 0"
+          v-for="note in userNotes"
+          :key="note.id"
           class="mb-6 p-2 rounded-lg dark:bg-gray-800 shadow"
         >
           <p class="px-2 text-gray-400">
-            <span>{{ formatDate(tx.timeStamp) }}</span>
+            <span>{{ formatDate(note.createdTimestamp) }}</span>
           </p>
           <div class="text-gray-700 my-2">
             <p
               class="bg-gray-100 dark:bg-gray-700 dark:text-gray-100 p-4 rounded-lg text-lg"
             >
-              {{ tx.decryptedContent }}
+              {{ note.decryptedContent }}
             </p>
           </div>
-          <p class="text-gray-400 px-2">
-            <span> {{ parseFloat(tx.valueInEth).toFixed(4) }} ETH</span>
-            <span class="float-right">
-              <a
-                :href="`${explorerUrl}/tx/${tx.hash}`"
-                target="_blank"
-                class="hover:underline"
-              >
-                {{ shortenTxHash(tx.hash) }}
-              </a>
-            </span>
-          </p>
+        </div>
+        <div v-else class="text-gray-500 text-center mt-8">
+          You have no notes yet.
         </div>
       </div>
     </div>
@@ -124,19 +118,21 @@ const networkParams = {
 };
 
 let web3, contract;
+const isLoading = ref(true);
 const userAddress = ref('');
 const encryptionKey = ref('');
 const noteContent = ref('');
 const isSubmitting = ref(false);
 const txId = ref('');
 const userTransactions = ref([]);
+const userNotes = ref([]);
 
+const estimatedGas = ref(0);
 const isModalOpen = ref(false);
-const selectedTxId = ref('');
 
-let deployPriceUSD = 0.5;
+let deployPriceUSD = 0.3;
 let deployPriceETH = additionFee;
-let ethPriceUSD = 2500;
+let ethPriceUSD = 3000;
 
 const connectWalletAndSwitchNetwork = async () => {
   await connectWallet();
@@ -187,6 +183,42 @@ const switchNetwork = async () => {
   }
 };
 
+async function estimateGasForTransaction(
+  contract,
+  method,
+  params,
+  fromAddress
+) {
+  try {
+    // Estimate the gas required for the transaction
+    const valueInWei = web3.utils.toWei(deployPriceETH, 'ether');
+    const gasAmount = await contract.methods[method](...params).estimateGas({
+      from: fromAddress,
+      value: valueInWei,
+      gas: web3.utils.toWei('0.1', 'gwei'),
+      gasPrice: web3.utils.toWei('0.1', 'gwei'),
+    });
+    return gasAmount;
+  } catch (error) {
+    console.error('Error estimating gas:', error);
+    throw error;
+  }
+}
+
+async function getEstimatedGasForNoteCreation() {
+  try {
+    estimatedGas.value = await estimateGasForTransaction(
+      contract,
+      'addNote',
+      ['0x1234567890', 'Sample encrypted note'],
+      userAddress.value
+    );
+    console.log('Estimated Gas:', estimatedGas.value);
+  } catch (error) {
+    console.error('Error estimating gas:', error);
+  }
+}
+
 const deriveEncryptionKey = (address) => {
   return keccak256(address);
 };
@@ -201,7 +233,8 @@ const shortenTxHash = (txHash, startCut = 6, endCut = 4) => {
 };
 
 const formatDate = (timestamp) => {
-  const date = new Date(timestamp * 1000); // Convert timestamp to milliseconds
+  // Ensure the timestamp is a number and convert BigInt to a number by multiplying it with 1000
+  const date = new Date(Number(timestamp) * 1000);
   return date.toLocaleDateString(undefined, {
     // 'undefined' uses the browser's locale
     year: 'numeric',
@@ -279,8 +312,8 @@ const submitNote = async () => {
       .send({
         from: userAddress.value,
         value: valueInWei,
+        gas: estimatedGas.value,
         gasPrice: gasPrice,
-        gas: gasPrice,
       });
     txId.value = tx.transactionHash;
 
@@ -304,18 +337,6 @@ const submitNote = async () => {
   }
 
   isSubmitting.value = false;
-};
-
-const getOwnNotes = async () => {
-  try {
-    const noteIds = await contract.methods
-      .getOwnNotesIds()
-      .call({ from: userAddress.value });
-    console.log('Owned note IDs:', noteIds);
-    return noteIds;
-  } catch (error) {
-    console.error('Error fetching owned note IDs:', error);
-  }
 };
 
 async function getWalletNotes(userAddress) {
@@ -343,86 +364,20 @@ async function getWalletNotes(userAddress) {
 
 async function fetchUserNotes() {
   const notes = await getWalletNotes(userAddress.value);
+
+  // decrypt notes
+  notes.forEach((note) => {
+    note.decryptedContent = decryptNote(
+      note.encryptedContent,
+      encryptionKey.value
+    );
+  });
+
+  userNotes.value = notes;
+  isLoading.value = false;
+
   console.log('User notes:', notes);
 }
-
-// const fetchOwnedNotesDetails = async () => {
-//   if (!userAddress.value) {
-//     console.error('User address not found');
-//     return;
-//   }
-
-//   try {
-//     const noteIds = await contract.methods
-//       .getOwnNotesIds()
-//       .call({ from: userAddress.value });
-
-//     const notesPromises = noteIds.map(async (noteId) => {
-//       const encryptedNote = await contract.methods
-//         .getNoteById(noteId)
-//         .call({ from: userAddress.value });
-
-//       return {
-//         id: noteId,
-//         decryptedContent: decryptNote(encryptedNote, encryptionKey.value),
-//         timeStamp: Date.now() / 1000,
-//         valueInEth: additionFee,
-//       };
-//     });
-
-//     const fetchedNotes = await Promise.all(notesPromises);
-//     userTransactions.value = fetchedNotes.map((note) => ({
-//       ...note,
-//       hash: note.id, // Using note ID as a placeholder for transaction hash
-//     }));
-//   } catch (error) {
-//     console.error('Error fetching owned notes details:', error);
-//   }
-// };
-
-// const fetchOwnNotes = async () => {
-//   try {
-//     const events = await contract.getPastEvents('NoteAdded', {
-//       filter: { owner: userAddress.value },
-//       fromBlock: startBlock,
-//       toBlock: 'latest',
-//     });
-
-//     const notes = await Promise.all(
-//       events.map(async (event) => {
-//         const { noteId, fee, timestamp } = event.returnValues;
-//         console.log('Note ID:', noteId, 'Fee:', fee, 'Timestamp:', timestamp);
-
-//         const noteData = await contract.methods
-//           .getNoteById(noteId)
-//           .call({ from: userAddress.value });
-//         console.log(noteData); // Ensure this logs the expected structure
-
-//         const encryptedNote = noteData[0];
-//         const noteTimestamp = noteData[1];
-
-//         const valueInEth = web3.utils.fromWei(fee.toString(), 'ether');
-//         const isoTimestamp = new Date(noteTimestamp * 1000).toISOString();
-
-//         const decryptedContent = decryptNote(
-//           encryptedNote,
-//           encryptionKey.value
-//         );
-
-//         return {
-//           id: noteId,
-//           decryptedContent,
-//           timeStamp: noteTimestamp,
-//           valueInEth,
-//         };
-//       })
-//     );
-
-//     userTransactions.value = notes;
-//   } catch (error) {
-//     console.error('Error fetching notes:', error);
-//   }
-// };
 
 const fetchTransactions = async () => {
   const { data } = await useLazyFetch(
@@ -457,11 +412,6 @@ const fetchETHPrice = async () => {
   }
 };
 
-// const calculateETHForFixedUSD = (fixedUSD = 0.5) =>
-//   (fixedUSD / ethPriceUSD).toFixed(18).toString();
-
-// const convertETHToUSD = (ethAmount) => (ethAmount * ethPriceUSD).toFixed(2);
-
 onMounted(async () => {
   if (!window.ethereum) {
     console.error('No wallet detected');
@@ -477,11 +427,13 @@ onMounted(async () => {
   // Fetch transactions if user is connected
   if (userAddress.value) {
     await switchNetwork();
-    // fetchOwnedNotesDetails();
-    fetchTransactions();
-    // await getOwnNotes();
-    // fetchOwnNotes();
+    // fetchTransactions();
+
+    // Fetch user notes (if any) using RPC call
     fetchUserNotes();
+
+    // Estimate gas for note creation
+    getEstimatedGasForNoteCreation();
   }
 
   // Fetch ETH price and calculate deploy price in USD
