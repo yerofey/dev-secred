@@ -268,6 +268,8 @@ const submitNote = async () => {
   const noteIdBigInt = `0x${bigInt(noteIdHash, 16).toString(16)}`;
   const encryptedContent = encryptNote(noteContent.value, encryptionKey.value);
 
+  const gasPrice = web3.utils.toWei('0.01', 'gwei');
+
   // Call the smart contract function to add the note
   try {
     const timestamp = Math.floor(Date.now() / 1000);
@@ -277,8 +279,8 @@ const submitNote = async () => {
       .send({
         from: userAddress.value,
         value: valueInWei,
-        gasPrice: web3.utils.toWei('0.01', 'gwei'),
-        gas: web3.utils.toWei('0.001', 'gwei'),
+        gasPrice: gasPrice,
+        gas: gasPrice,
       });
     txId.value = tx.transactionHash;
 
@@ -316,83 +318,111 @@ const getOwnNotes = async () => {
   }
 };
 
-const fetchOwnedNotesDetails = async () => {
-  if (!userAddress.value) {
-    console.error('User address not found');
-    return;
-  }
-
+async function getWalletNotes(userAddress) {
   try {
     const noteIds = await contract.methods
       .getOwnNotesIds()
-      .call({ from: userAddress.value });
+      .call({ from: userAddress });
 
     const notesPromises = noteIds.map(async (noteId) => {
-      const encryptedNote = await contract.methods
-        .getNoteById(noteId)
-        .call({ from: userAddress.value });
-
+      const noteDetails = await contract.methods.getNoteById(noteId).call();
       return {
         id: noteId,
-        decryptedContent: decryptNote(encryptedNote, encryptionKey.value),
-        timeStamp: Date.now() / 1000,
-        valueInEth: additionFee,
+        encryptedContent: noteDetails[0],
+        createdTimestamp: noteDetails[1],
       };
     });
 
-    const fetchedNotes = await Promise.all(notesPromises);
-    userTransactions.value = fetchedNotes.map((note) => ({
-      ...note,
-      hash: note.id, // Using note ID as a placeholder for transaction hash
-    }));
+    const notes = await Promise.all(notesPromises);
+    return notes;
   } catch (error) {
-    console.error('Error fetching owned notes details:', error);
+    console.error('Failed to fetch user notes:', error);
+    return [];
   }
-};
+}
 
-const fetchOwnNotes = async () => {
-  try {
-    const events = await contract.getPastEvents('NoteAdded', {
-      filter: { owner: userAddress.value },
-      fromBlock: startBlock,
-      toBlock: 'latest',
-    });
+async function fetchUserNotes() {
+  const notes = await getWalletNotes(userAddress.value);
+  console.log('User notes:', notes);
+}
 
-    const notes = await Promise.all(
-      events.map(async (event) => {
-        const { noteId, fee, timestamp } = event.returnValues;
-        console.log('Note ID:', noteId, 'Fee:', fee, 'Timestamp:', timestamp);
+// const fetchOwnedNotesDetails = async () => {
+//   if (!userAddress.value) {
+//     console.error('User address not found');
+//     return;
+//   }
 
-        const noteData = await contract.methods
-          .getNoteById(noteId)
-          .call({ from: userAddress.value });
-        console.log(noteData); // Ensure this logs the expected structure
+//   try {
+//     const noteIds = await contract.methods
+//       .getOwnNotesIds()
+//       .call({ from: userAddress.value });
 
-        const encryptedNote = noteData[0];
-        const noteTimestamp = noteData[1];
+//     const notesPromises = noteIds.map(async (noteId) => {
+//       const encryptedNote = await contract.methods
+//         .getNoteById(noteId)
+//         .call({ from: userAddress.value });
 
-        const valueInEth = web3.utils.fromWei(fee.toString(), 'ether');
-        const isoTimestamp = new Date(noteTimestamp * 1000).toISOString();
+//       return {
+//         id: noteId,
+//         decryptedContent: decryptNote(encryptedNote, encryptionKey.value),
+//         timeStamp: Date.now() / 1000,
+//         valueInEth: additionFee,
+//       };
+//     });
 
-        const decryptedContent = decryptNote(
-          encryptedNote,
-          encryptionKey.value
-        );
+//     const fetchedNotes = await Promise.all(notesPromises);
+//     userTransactions.value = fetchedNotes.map((note) => ({
+//       ...note,
+//       hash: note.id, // Using note ID as a placeholder for transaction hash
+//     }));
+//   } catch (error) {
+//     console.error('Error fetching owned notes details:', error);
+//   }
+// };
 
-        return {
-          id: noteId,
-          decryptedContent,
-          timeStamp: noteTimestamp,
-          valueInEth,
-        };
-      })
-    );
+// const fetchOwnNotes = async () => {
+//   try {
+//     const events = await contract.getPastEvents('NoteAdded', {
+//       filter: { owner: userAddress.value },
+//       fromBlock: startBlock,
+//       toBlock: 'latest',
+//     });
 
-    userTransactions.value = notes;
-  } catch (error) {
-    console.error('Error fetching notes:', error);
-  }
-};
+//     const notes = await Promise.all(
+//       events.map(async (event) => {
+//         const { noteId, fee, timestamp } = event.returnValues;
+//         console.log('Note ID:', noteId, 'Fee:', fee, 'Timestamp:', timestamp);
+
+//         const noteData = await contract.methods
+//           .getNoteById(noteId)
+//           .call({ from: userAddress.value });
+//         console.log(noteData); // Ensure this logs the expected structure
+
+//         const encryptedNote = noteData[0];
+//         const noteTimestamp = noteData[1];
+
+//         const valueInEth = web3.utils.fromWei(fee.toString(), 'ether');
+//         const isoTimestamp = new Date(noteTimestamp * 1000).toISOString();
+
+//         const decryptedContent = decryptNote(
+//           encryptedNote,
+//           encryptionKey.value
+//         );
+
+//         return {
+//           id: noteId,
+//           decryptedContent,
+//           timeStamp: noteTimestamp,
+//           valueInEth,
+//         };
+//       })
+//     );
+
+//     userTransactions.value = notes;
+//   } catch (error) {
+//     console.error('Error fetching notes:', error);
+//   }
+// };
 
 const fetchTransactions = async () => {
   const { data } = await useLazyFetch(
@@ -451,6 +481,7 @@ onMounted(async () => {
     fetchTransactions();
     // await getOwnNotes();
     // fetchOwnNotes();
+    fetchUserNotes();
   }
 
   // Fetch ETH price and calculate deploy price in USD
