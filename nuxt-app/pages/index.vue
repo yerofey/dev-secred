@@ -210,7 +210,7 @@ async function getEstimatedGasForNoteCreation() {
     estimatedGas.value = await estimateGasForTransaction(
       contract,
       'addNote',
-      ['0x1234567890', 'Sample encrypted note'],
+      ['0x1234567890', "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book."],
       userAddress.value
     );
     console.log('Estimated Gas:', estimatedGas.value);
@@ -301,7 +301,7 @@ const submitNote = async () => {
   const noteIdBigInt = `0x${bigInt(noteIdHash, 16).toString(16)}`;
   const encryptedContent = encryptNote(noteContent.value, encryptionKey.value);
 
-  const gasPrice = web3.utils.toWei('0.01', 'gwei');
+  const gasPrice = estimatedGas.value;
 
   // Call the smart contract function to add the note
   try {
@@ -375,8 +375,6 @@ async function fetchUserNotes() {
 
   userNotes.value = notes;
   isLoading.value = false;
-
-  console.log('User notes:', notes);
 }
 
 const fetchTransactions = async () => {
