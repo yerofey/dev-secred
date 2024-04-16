@@ -277,6 +277,8 @@ const submitNote = async () => {
       .send({
         from: userAddress.value,
         value: valueInWei,
+        gasPrice: web3.utils.toWei('0.01', 'gwei'),
+        gas: web3.utils.toWei('0.001', 'gwei'),
       });
     txId.value = tx.transactionHash;
 
