@@ -10,13 +10,14 @@ async function main() {
     contractABI.abi,
     deployer
   );
-  // Call the withdraw function from the contract
-  console.log('Withdrawing funds...');
-  const tx = await secretNotesContract.withdraw();
+  // Call the updateNoteAdditionFee function from the contract
+  console.log('Updating addition fee...');
+  const _noteAdditionFee = 100000000000000; // 0.0001 ETH
+  const tx = await secretNotesContract.updateNoteAdditionFee(_noteAdditionFee);
 
   // Wait for the transaction to be mined
   await tx.wait();
-  console.log('Funds withdrawn!', tx.hash);
+  console.log('Fee updated!', tx.hash);
 }
 
 main()
