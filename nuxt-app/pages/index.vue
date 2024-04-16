@@ -127,7 +127,7 @@ const txId = ref('');
 const userTransactions = ref([]);
 const userNotes = ref([]);
 
-const estimatedGas = ref(0);
+// const estimatedGas = ref(0);
 const isModalOpen = ref(false);
 
 let deployPriceUSD = 0.3;
@@ -183,6 +183,24 @@ const switchNetwork = async () => {
   }
 };
 
+async function fetchGasPrice() {
+  // let gasPrice = 0;
+  // try {
+  //   gasPrice = await web3.eth.getGasPrice();
+  //   console.log('Gas Price:', gasPrice);
+  // } catch (error) {
+  //   console.error('Error fetching gas price:', error);
+  // }
+
+  const customGasPrice = web3.utils.toWei('0.1', 'gwei');
+  // console.log('Custom Gas Price:', customGasPrice);
+
+  // increase gas price by 10%
+  // const customGasPrice = parseInt(gasPrice) * 1.1;
+
+  return customGasPrice;
+}
+
 async function estimateGasForTransaction(
   contract,
   method,
@@ -202,20 +220,6 @@ async function estimateGasForTransaction(
   } catch (error) {
     console.error('Error estimating gas:', error);
     throw error;
-  }
-}
-
-async function getEstimatedGasForNoteCreation() {
-  try {
-    estimatedGas.value = await estimateGasForTransaction(
-      contract,
-      'addNote',
-      ['0x1234567890', "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book."],
-      userAddress.value
-    );
-    console.log('Estimated Gas:', estimatedGas.value);
-  } catch (error) {
-    console.error('Error estimating gas:', error);
   }
 }
 
@@ -301,7 +305,27 @@ const submitNote = async () => {
   const noteIdBigInt = `0x${bigInt(noteIdHash, 16).toString(16)}`;
   const encryptedContent = encryptNote(noteContent.value, encryptionKey.value);
 
-  const gasPrice = estimatedGas.value;
+  // Estimate gas for the transaction
+  let estimatedGas = 0;
+  try {
+    estimatedGas = Number(
+      (await estimateGasForTransaction(
+        contract,
+        'addNote',
+        [
+          noteIdBigInt,
+          encryptedContent,
+        ],
+        userAddress.value
+      )) || 0
+    );
+    // increase gas by 5%
+    estimatedGas = Math.ceil(estimatedGas * 1.05);
+  } catch (error) {
+    console.error('Error estimating gas:', error);
+  }
+
+  const currentGasPrice = await fetchGasPrice();
 
   // Call the smart contract function to add the note
   try {
@@ -312,22 +336,21 @@ const submitNote = async () => {
       .send({
         from: userAddress.value,
         value: valueInWei,
-        gas: estimatedGas.value,
-        gasPrice: gasPrice,
+        gas: estimatedGas,
+        gasPrice: currentGasPrice,
       });
     txId.value = tx.transactionHash;
 
-    // Construct the transaction object (simplified example)
-    const newTransaction = {
-      ...tx,
-      hash: tx.transactionHash,
-      decryptedContent: noteContent.value,
-      valueInEth: deployPriceETH,
-      timeStamp: timestamp,
-    };
-
-    // Append the new transaction to the existing list
-    userTransactions.value = [newTransaction, ...userTransactions.value];
+    // Add the note to the user's notes list
+    userNotes.value = [
+      {
+        id: noteId,
+        encryptedContent,
+        decryptedContent: noteContent.value,
+        createdTimestamp: timestamp,
+      },
+      ...userNotes.value,
+    ];
 
     // Clear the note content after submission
     noteContent.value = '';
@@ -372,6 +395,9 @@ async function fetchUserNotes() {
       encryptionKey.value
     );
   });
+
+  // sort notes by timestamp in descending order
+  notes.sort((a, b) => Number(b.createdTimestamp) - Number(a.createdTimestamp));
 
   userNotes.value = notes;
   isLoading.value = false;
@@ -431,7 +457,7 @@ onMounted(async () => {
     fetchUserNotes();
 
     // Estimate gas for note creation
-    getEstimatedGasForNoteCreation();
+    // getEstimatedGasForNoteCreation();
   }
 
   // Fetch ETH price and calculate deploy price in USD
