@@ -8,17 +8,17 @@ import hre from 'hardhat';
 
 async function main() {
   // Grab the contract factory
-  const SecretNotes = await hre.ethers.getContractFactory('SecretNotes');
+  const SecretChats = await hre.ethers.getContractFactory('SecretChats');
 
   // Set the constructor arguments
-  const _noteAdditionFee = 200000000000000; // 0.0002 ETH
+  const _chatAdditionFee = 500000000000000; // 0.0005 ETH
 
   // Start deployment, returning a promise that resolves to a contract object
-  const secretNotes = await SecretNotes.deploy(_noteAdditionFee); // Constructor arguments would go here
+  const secretChats = await SecretChats.deploy(_chatAdditionFee); // Constructor arguments would go here
   // Wait for the deployment transaction to be mined
-  await secretNotes.waitForDeployment();
+  await secretChats.waitForDeployment();
 
-  console.log('Contract deployed to address:', secretNotes.target);
+  console.log('Contract deployed to address:', secretChats.target);
 }
 
 main()
