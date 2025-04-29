@@ -358,24 +358,6 @@ const switchNetwork = async () => {
   }
 };
 
-async function fetchGasPrice() {
-  // let gasPrice = 0;
-  // try {
-  //   gasPrice = await web3.eth.getGasPrice();
-  //   console.log('Gas Price:', gasPrice);
-  // } catch (error) {
-  //   console.error('Error fetching gas price:', error);
-  // }
-
-  const customGasPrice = web3.utils.toWei('0.1', 'gwei');
-  // console.log('Custom Gas Price:', customGasPrice);
-
-  // increase gas price by 10%
-  // const customGasPrice = parseInt(gasPrice) * 1.1;
-
-  return customGasPrice;
-}
-
 async function estimateGasForTransaction(
   contract,
   method,
@@ -383,18 +365,28 @@ async function estimateGasForTransaction(
   fromAddress
 ) {
   try {
-    // Estimate the gas required for the transaction
     const valueInWei = web3.utils.toWei(deployPriceETH, 'ether');
     const gasAmount = await contract.methods[method](...params).estimateGas({
       from: fromAddress,
-      value: valueInWei,
-      gas: web3.utils.toWei('0.1', 'gwei'),
-      gasPrice: web3.utils.toWei('0.1', 'gwei'),
+      value: valueInWei
     });
     return gasAmount;
   } catch (error) {
     console.error('Error estimating gas:', error);
     throw error;
+  }
+}
+
+async function fetchGasPrice() {
+  try {
+    const gasPrice = await web3.eth.getGasPrice();
+    // Add 10% to the gas price to ensure transaction goes through
+    const increasedGasPrice = Math.floor(Number(gasPrice) * 1.1);
+    return increasedGasPrice;
+  } catch (error) {
+    console.error('Error fetching gas price:', error);
+    // Fallback to a reasonable gas price if the API call fails
+    return web3.utils.toWei('0.1', 'gwei');
   }
 }
 
@@ -485,6 +477,10 @@ const submitNote = async () => {
   isSubmitting.value = true;
 
   try {
+    // Get the current note addition fee from the contract
+    const currentFee = await contract.methods.getNoteAdditionFee().call();
+    const valueInWei = currentFee.toString(); // Use the exact fee from the contract
+
     const noteId = nanoid();
     const noteIdHash = await hashNoteId(noteId);
     const noteIdBigInt = `0x${bigInt(noteIdHash, 16).toString(16)}`;
@@ -494,14 +490,12 @@ const submitNote = async () => {
     let estimatedGas = 0;
     try {
       estimatedGas = Number(
-        (await estimateGasForTransaction(
-          contract,
-          'addNote',
-          [noteIdBigInt, encryptedContent],
-          userAddress.value
-        )) || 0
+        await contract.methods.addNote(noteIdBigInt, encryptedContent).estimateGas({
+          from: userAddress.value,
+          value: valueInWei
+        })
       );
-      estimatedGas = Math.ceil(estimatedGas * 1.05);
+      estimatedGas = Math.ceil(estimatedGas * 1.05); // Add 5% buffer
     } catch (error) {
       console.error('Error estimating gas:', error);
       if (error.message.includes('insufficient fee')) {
@@ -521,7 +515,6 @@ const submitNote = async () => {
 
     const currentGasPrice = await fetchGasPrice();
     const timestamp = Math.floor(Date.now() / 1000);
-    const valueInWei = web3.utils.toWei(deployPriceETH, 'ether');
 
     const tx = await contract.methods
       .addNote(noteIdBigInt, encryptedContent)
@@ -696,14 +689,20 @@ onMounted(async () => {
     // Fetch user notes (if any) using RPC call
     fetchUserNotes();
 
-    // Estimate gas for note creation
-    // getEstimatedGasForNoteCreation();
+    // Get the actual note addition fee from the contract
+    try {
+      const fee = await contract.methods.getNoteAdditionFee().call();
+      deployPriceETH = web3.utils.fromWei(fee, 'ether');
+      console.log('Note addition fee:', deployPriceETH, 'ETH');
+      
+      // Fetch ETH price and calculate deploy price in USD
+      ethPriceUSD = parseFloat(await fetchETHPrice());
+      console.log('ETH Price:', ethPriceUSD);
+      deployPriceUSD = (ethPriceUSD * deployPriceETH).toFixed(2);
+    } catch (error) {
+      console.error('Error fetching note addition fee:', error);
+    }
   }
-
-  // Fetch ETH price and calculate deploy price in USD
-  ethPriceUSD = parseFloat(await fetchETHPrice());
-  console.log('ETH Price:', ethPriceUSD);
-  deployPriceUSD = (ethPriceUSD * deployPriceETH).toFixed(2);
 });
 </script>
 
