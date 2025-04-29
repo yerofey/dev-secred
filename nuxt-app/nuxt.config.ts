@@ -11,6 +11,7 @@ export default defineNuxtConfig({
     runtimeConfig: {
         public: {
             scanApiUrl: process.env.SCAN_API_URL,
+            scanChainId: process.env.SCAN_CHAIN_ID,
             explorerUrl: process.env.EXPLORER_URL,
             rpcUrl: process.env.RPC_URL,
             chainId: process.env.CHAIN_ID,
@@ -19,7 +20,6 @@ export default defineNuxtConfig({
             contractAddress: process.env.CONTRACT_ADDRESS,
             startBlock: process.env.START_BLOCK,
             additionFee: process.env.ADDITION_FEE_ETH,
-            scanApiKey: process.env.SCAN_API_KEY,
         },
         scanApiKey: process.env.SCAN_API_KEY,
     },
@@ -31,5 +31,6 @@ export default defineNuxtConfig({
     colorMode: {
         preference: 'dark',
     },
+    compatibilityDate: '2025-04-29',
     // devtools: { enabled: true },
 })

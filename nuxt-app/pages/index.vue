@@ -1,89 +1,195 @@
 <template>
-  <main class="sm:w-full md:w-[400px] lg:w-[500px] mx-auto">
-    <UButton v-if="!userAddress" @click="connectWalletAndSwitchNetwork">
-      Connect Wallet
-    </UButton>
-    <div v-else>
-      <div class="py-2">
-        <div class="mb-2 flex items-center justify-between">
-          <div>
-            Wallet:
-            <span class="text-gray-500">
-              <a
-                :href="`${explorerUrl}/address/${userAddress}`"
-                target="_blank"
-                >{{ shortenTxHash(userAddress) }}</a
-              >
-            </span>
-          </div>
-          <div>
-            Contract:
-            <span class="text-gray-500">
-              <a
-                :href="`${explorerUrl}/address/${contractAddress}`"
-                target="_blank"
-                >{{ shortenTxHash(contractAddress) }}</a
-              >
-            </span>
-          </div>
-        </div>
-        <form @submit.prevent="submitNote">
-          <UTextarea
-            v-model="noteContent"
-            placeholder="Insert the content you want to secure"
-            size="lg"
-          ></UTextarea>
-          <div class="flex items-center justify-between mt-2">
+  <div>
+    <!-- Alert Component -->
+    <div
+      v-if="alert.show"
+      class="fixed bottom-4 right-4 z-[9999] w-full max-w-sm transform transition-all duration-300 ease-in-out"
+      :class="{
+        'translate-y-0 opacity-100': alert.show,
+        'translate-y-full opacity-0': !alert.show
+      }"
+    >
+      <UAlert
+        :type="alert.type"
+        :title="alert.title"
+        :description="alert.description"
+        :icon="alert.icon"
+        class="shadow-lg w-full"
+        :ui="{
+          wrapper: 'p-4',
+          title: 'font-semibold text-lg',
+          description: 'mt-1 text-sm',
+          rounded: 'rounded-xl',
+          shadow: 'shadow-xl',
+          background: 'bg-white dark:bg-gray-900',
+          base: 'w-full relative',
+        }"
+      >
+        <template #default>
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="font-medium">{{ alert.title }}</p>
+              <p class="text-gray-600 dark:text-gray-300 mt-1">{{ alert.description }}</p>
+            </div>
             <UButton
-              type="submit"
-              @click="submitNote"
-              :disabled="isSubmitting || !noteContent"
-              size="lg"
-            >
-              {{ isSubmitting ? 'Submitting...' : 'Submit' }}
-            </UButton>
-            <span
-              v-if="!isSubmitting && txId"
-              class="ml-4 text-gray-500 text-sm"
-            >
-              Pending TX:
-              <a :href="`${explorerUrl}/tx/${txId}`" target="_blank">{{
-                shortenTxHash(txId)
-              }}</a>
-            </span>
-            <span v-if="!isSubmitting" class="ml-4 text-gray-400 text-sm">
-              ≈${{ parseFloat(deployPriceUSD).toFixed(2) }}
-            </span>
+              color="gray"
+              variant="ghost"
+              icon="i-heroicons-x-mark"
+              size="xs"
+              class="flex-shrink-0"
+              @click="dismissAlert"
+            />
           </div>
-        </form>
-      </div>
-      <div v-if="isLoading" class="flex items-center justify-center">
-        <Loader />
-      </div>
-      <div v-if="!isLoading" class="mt-8">
-        <div
-          v-if="userNotes.length > 0"
-          v-for="note in userNotes"
-          :key="note.id"
-          class="mb-6 p-2 rounded-lg dark:bg-gray-800 shadow"
-        >
-          <p class="px-2 text-gray-400">
-            <span>{{ formatDate(note.createdTimestamp) }}</span>
+        </template>
+      </UAlert>
+    </div>
+
+    <UContainer :ui="{ width: 'max-w-2xl mx-auto' }">
+      <!-- Hero Section (shown only when wallet is not connected) -->
+      <div v-if="!userAddress" class="py-20 text-center">
+        <UCard class="max-w-2xl mx-auto">
+          <template #header>
+            <div class="flex items-center justify-center gap-2">
+              <UIcon name="i-heroicons-lock-closed" class="w-8 h-8 text-primary" />
+              <h1 class="text-4xl font-bold">Secure Your Secrets on Base</h1>
+            </div>
+          </template>
+          
+          <p class="text-xl text-gray-600 dark:text-gray-300 mb-8">
+            Store your encrypted notes securely on the blockchain. Your secrets are protected by your wallet and accessible only by you.
           </p>
-          <div class="text-gray-700 my-2">
-            <p
-              class="bg-gray-100 dark:bg-gray-700 dark:text-gray-100 p-4 rounded-lg text-lg"
+
+          <UButton
+            size="xl"
+            color="primary"
+            @click="connectWalletAndSwitchNetwork"
+            class="mb-8"
+          >
+            <template #leading>
+              <UIcon name="i-heroicons-wallet" class="w-5 h-5" />
+            </template>
+            Connect Wallet
+          </UButton>
+        </UCard>
+      </div>
+
+      <!-- Features Section (shown only when wallet is not connected) -->
+      <div v-if="!userAddress" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-20">
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-shield-check" class="w-6 h-6 text-primary" />
+              <h3 class="font-semibold">End-to-End Encryption</h3>
+            </div>
+          </template>
+          <p class="text-gray-600 dark:text-gray-300">
+            Your notes are encrypted using your wallet's private key, ensuring only you can access them.
+          </p>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-server" class="w-6 h-6 text-primary" />
+              <h3 class="font-semibold">On-Chain Storage</h3>
+            </div>
+          </template>
+          <p class="text-gray-600 dark:text-gray-300">
+            Your encrypted notes are stored permanently on the Base blockchain, accessible anytime.
+          </p>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-bolt" class="w-6 h-6 text-primary" />
+              <h3 class="font-semibold">Fast & Efficient</h3>
+            </div>
+          </template>
+          <p class="text-gray-600 dark:text-gray-300">
+            Built on Base, enjoy low transaction fees and fast confirmation times.
+          </p>
+        </UCard>
+      </div>
+
+      <!-- Notes Section (shown when wallet is connected) -->
+      <div v-if="userAddress" class="pt-8 space-y-4">
+        <UCard class="bg-gray-50 dark:bg-gray-900">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-heroicons-wallet" class="w-5 h-5 text-primary" />
+              <UBadge color="primary" variant="subtle" size="lg">
+                {{ shortenTxHash(userAddress) }}
+              </UBadge>
+            </div>
+            <UButton
+              color="red"
+              variant="ghost"
+              size="sm"
+              @click="disconnectWallet"
+              class="flex items-center gap-1 hover:bg-red-100 dark:hover:bg-red-950"
             >
+              <UIcon name="i-heroicons-power" class="w-4 h-4" />
+              Disconnect
+            </UButton>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <h2 class="text-xl font-semibold">Your Secure Notes</h2>
+          </template>
+          
+          <form @submit.prevent="submitNote" class="space-y-4">
+            <UTextarea
+              v-model="noteContent"
+              placeholder="Type your secret note here..."
+              size="lg"
+              :rows="4"
+            />
+            <div class="flex items-center justify-between">
+              <UButton
+                type="submit"
+                :disabled="isSubmitting || !noteContent"
+                size="lg"
+                color="primary"
+              >
+                <template #leading>
+                  <UIcon name="i-heroicons-paper-airplane" class="w-5 h-5" />
+                </template>
+                {{ isSubmitting ? 'Submitting...' : 'Save Note' }}
+              </UButton>
+              <span v-if="!isSubmitting" class="text-sm text-gray-500">
+                Cost: ≈${{ parseFloat(deployPriceUSD).toFixed(2) }}
+              </span>
+            </div>
+          </form>
+        </UCard>
+
+        <div v-if="isLoading" class="flex items-center justify-center py-8">
+          <ULoadingIcon />
+        </div>
+
+        <div v-else-if="userNotes.length > 0" class="space-y-4">
+          <UCard v-for="note in userNotes" :key="note.id">
+            <div class="flex items-center justify-between mb-2">
+              <UBadge color="gray" variant="soft">
+                {{ formatDate(note.createdTimestamp) }}
+              </UBadge>
+            </div>
+            <p class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
               {{ note.decryptedContent }}
             </p>
-          </div>
+          </UCard>
         </div>
-        <div v-else class="text-gray-500 text-center mt-8">
-          You don't have any notes yet
+
+        <div v-else class="text-center py-8 text-gray-500">
+          <UIcon name="i-heroicons-document-text" class="w-12 h-12 mx-auto mb-4" />
+          <p>You don't have any notes yet</p>
         </div>
       </div>
-    </div>
-  </main>
+    </UContainer>
+  </div>
 </template>
 
 <script setup>
@@ -130,9 +236,57 @@ const userNotes = ref([]);
 // const estimatedGas = ref(0);
 const isModalOpen = ref(false);
 
-let deployPriceUSD = 0.3;
+let deployPriceUSD = 0.1;
 let deployPriceETH = additionFee;
-let ethPriceUSD = 3000;
+let ethPriceUSD = 1800;
+
+const toast = useToast();
+
+// Alert state
+const alert = reactive({
+  show: false,
+  type: 'info',
+  title: '',
+  description: '',
+  icon: '',
+  timeout: null
+});
+
+const dismissAlert = () => {
+  alert.show = false;
+  if (alert.timeout) {
+    clearTimeout(alert.timeout);
+  }
+};
+
+const showAlert = (type, title, description) => {
+  // Clear any existing timeout
+  if (alert.timeout) {
+    clearTimeout(alert.timeout);
+  }
+
+  // Set alert properties
+  alert.type = type;
+  alert.title = title;
+  alert.description = description;
+  alert.icon = type === 'success' ? 'i-heroicons-check-circle' 
+             : type === 'danger' ? 'i-heroicons-x-circle'
+             : 'i-heroicons-information-circle';
+  alert.show = true;
+
+  // Auto-dismiss after 5 seconds
+  alert.timeout = setTimeout(() => {
+    dismissAlert();
+  }, 5000);
+};
+
+const showErrorAlert = (title, description) => {
+  showAlert('danger', title, description);
+};
+
+const showSuccessAlert = (title, description) => {
+  showAlert('success', title, description);
+};
 
 const connectWalletAndSwitchNetwork = async () => {
   await connectWallet();
@@ -141,28 +295,45 @@ const connectWalletAndSwitchNetwork = async () => {
 
 const connectWallet = async () => {
   if (typeof window.ethereum === 'undefined') {
-    console.error('No wallet detected');
+    showErrorAlert(
+      'Wallet Not Found',
+      'Please install MetaMask or another Web3 wallet.'
+    );
     return;
   }
 
-  // Request account access
   try {
     const accounts = await window.ethereum.request({
       method: 'eth_requestAccounts',
     });
     userAddress.value = accounts[0];
-
-    // After successfully connecting, derive the encryption key
     encryptionKey.value = deriveEncryptionKey(userAddress.value);
-    // console.log('Encryption Key:', encryptionKey.value);
+    showSuccessAlert(
+      'Connected',
+      'Wallet connected successfully!'
+    );
   } catch (error) {
+    if (error.code === 4001) {
+      showErrorAlert(
+        'Connection Rejected',
+        'You rejected the wallet connection request.'
+      );
+    } else {
+      showErrorAlert(
+        'Connection Failed',
+        'Failed to connect wallet. Please try again.'
+      );
+    }
     console.error(error);
   }
 };
 
 const switchNetwork = async () => {
   if (typeof window.ethereum === 'undefined') {
-    console.error('No wallet detected');
+    showErrorAlert(
+      'Wallet Not Found',
+      'Please install MetaMask or another Web3 wallet.'
+    );
     return;
   }
 
@@ -178,6 +349,10 @@ const switchNetwork = async () => {
         params: [networkParams],
       });
     } catch (addError) {
+      showErrorAlert(
+        'Switch Failed',
+        'Failed to switch to Base network. Please try again.'
+      );
       console.error(addError);
     }
   }
@@ -284,53 +459,70 @@ const hashNoteId = async (noteId) => {
 
 const submitNote = async () => {
   if (!window.ethereum) {
-    console.error('No wallet detected');
+    showErrorAlert(
+      'Wallet Not Found',
+      'Please install MetaMask or another Web3 wallet.'
+    );
     return;
   }
 
   if (!userAddress.value) {
-    console.error('User address not found');
+    showErrorAlert(
+      'Not Connected',
+      'Please connect your wallet first.'
+    );
     return;
   }
 
   if (!noteContent.value) {
-    console.error('Note content is empty');
+    showErrorAlert(
+      'Empty Note',
+      'Please enter some content for your note.'
+    );
     return;
   }
 
   isSubmitting.value = true;
 
-  const noteId = nanoid(); // Generate a unique note ID
-  const noteIdHash = await hashNoteId(noteId);
-  const noteIdBigInt = `0x${bigInt(noteIdHash, 16).toString(16)}`;
-  const encryptedContent = encryptNote(noteContent.value, encryptionKey.value);
-
-  // Estimate gas for the transaction
-  let estimatedGas = 0;
   try {
-    estimatedGas = Number(
-      (await estimateGasForTransaction(
-        contract,
-        'addNote',
-        [
-          noteIdBigInt,
-          encryptedContent,
-        ],
-        userAddress.value
-      )) || 0
-    );
-    // increase gas by 5%
-    estimatedGas = Math.ceil(estimatedGas * 1.05);
-  } catch (error) {
-    console.error('Error estimating gas:', error);
-  }
+    const noteId = nanoid();
+    const noteIdHash = await hashNoteId(noteId);
+    const noteIdBigInt = `0x${bigInt(noteIdHash, 16).toString(16)}`;
+    const encryptedContent = encryptNote(noteContent.value, encryptionKey.value);
 
-  const currentGasPrice = await fetchGasPrice();
+    // Estimate gas for the transaction
+    let estimatedGas = 0;
+    try {
+      estimatedGas = Number(
+        (await estimateGasForTransaction(
+          contract,
+          'addNote',
+          [noteIdBigInt, encryptedContent],
+          userAddress.value
+        )) || 0
+      );
+      estimatedGas = Math.ceil(estimatedGas * 1.05);
+    } catch (error) {
+      console.error('Error estimating gas:', error);
+      if (error.message.includes('insufficient fee')) {
+        showErrorAlert(
+          'Insufficient Funds',
+          'You do not have enough funds to cover the transaction fee.'
+        );
+      } else {
+        showErrorAlert(
+          'Gas Estimation Failed',
+          'Failed to estimate transaction cost. Please try again.'
+        );
+      }
+      isSubmitting.value = false;
+      return;
+    }
 
-  // Call the smart contract function to add the note
-  try {
+    const currentGasPrice = await fetchGasPrice();
     const timestamp = Math.floor(Date.now() / 1000);
     const valueInWei = web3.utils.toWei(deployPriceETH, 'ether');
+
     const tx = await contract.methods
       .addNote(noteIdBigInt, encryptedContent)
       .send({
@@ -339,6 +531,7 @@ const submitNote = async () => {
         gas: estimatedGas,
         gasPrice: currentGasPrice,
       });
+
     txId.value = tx.transactionHash;
 
     // Add the note to the user's notes list
@@ -355,11 +548,38 @@ const submitNote = async () => {
     // Clear the note content after submission
     noteContent.value = '';
     txId.value = '';
+    
+    showSuccessAlert(
+      'Note Saved',
+      'Your note has been saved successfully!'
+    );
   } catch (error) {
-    console.error(error);
+    console.error('Transaction error:', error);
+    
+    if (error.code === 4001) {
+      showErrorAlert(
+        'Transaction Rejected',
+        'You rejected the transaction.'
+      );
+    } else if (error.message.includes('insufficient funds')) {
+      showErrorAlert(
+        'Insufficient Funds',
+        'You do not have enough funds to complete the transaction.'
+      );
+    } else if (error.message.includes('nonce')) {
+      showErrorAlert(
+        'Transaction Error',
+        'Transaction sequence error. Please reset your wallet or try again.'
+      );
+    } else {
+      showErrorAlert(
+        'Transaction Failed',
+        'Failed to save note. Please try again.'
+      );
+    }
+  } finally {
+    isSubmitting.value = false;
   }
-
-  isSubmitting.value = false;
 };
 
 async function getWalletNotes(userAddress) {
@@ -386,21 +606,30 @@ async function getWalletNotes(userAddress) {
 }
 
 async function fetchUserNotes() {
-  const notes = await getWalletNotes(userAddress.value);
+  try {
+    const notes = await getWalletNotes(userAddress.value);
 
-  // decrypt notes
-  notes.forEach((note) => {
-    note.decryptedContent = decryptNote(
-      note.encryptedContent,
-      encryptionKey.value
+    // decrypt notes
+    notes.forEach((note) => {
+      note.decryptedContent = decryptNote(
+        note.encryptedContent,
+        encryptionKey.value
+      );
+    });
+
+    // sort notes by timestamp in descending order
+    notes.sort((a, b) => Number(b.createdTimestamp) - Number(a.createdTimestamp));
+
+    userNotes.value = notes;
+  } catch (error) {
+    console.error('Failed to fetch notes:', error);
+    showErrorAlert(
+      'Fetch Error',
+      'Failed to load your notes. Please try again.'
     );
-  });
-
-  // sort notes by timestamp in descending order
-  notes.sort((a, b) => Number(b.createdTimestamp) - Number(a.createdTimestamp));
-
-  userNotes.value = notes;
-  isLoading.value = false;
+  } finally {
+    isLoading.value = false;
+  }
 }
 
 const fetchTransactions = async () => {
@@ -436,6 +665,17 @@ const fetchETHPrice = async () => {
   }
 };
 
+const disconnectWallet = () => {
+  userAddress.value = '';
+  encryptionKey.value = '';
+  userNotes.value = [];
+  isLoading.value = true;
+  showSuccessAlert(
+    'Disconnected',
+    'Wallet disconnected successfully!'
+  );
+};
+
 onMounted(async () => {
   if (!window.ethereum) {
     console.error('No wallet detected');
@@ -468,7 +708,24 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-main {
-  padding: 1rem;
+.translate-y-full {
+  transform: translateY(100%);
+}
+
+.translate-y-0 {
+  transform: translateY(0);
+}
+
+/* Add max width constraint for larger screens */
+:deep(.container) {
+  max-width: 768px !important;
+}
+
+/* Ensure alert content is always visible */
+:deep(.alert) {
+  position: relative;
+  z-index: 9999;
+  width: 100%;
+  overflow: visible;
 }
 </style>
