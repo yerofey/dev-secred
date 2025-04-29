@@ -137,7 +137,20 @@
 
         <UCard>
           <template #header>
-            <h2 class="text-xl font-semibold">Your Secure Notes</h2>
+            <div class="flex items-center justify-between">
+              <h2 class="text-xl font-semibold">Your Secure Notes</h2>
+              <UButton
+                :to="`${explorerUrl}/address/${contractAddress}`"
+                target="_blank"
+                color="gray"
+                variant="ghost"
+                size="sm"
+                class="flex items-center gap-1"
+              >
+                <UIcon name="i-heroicons-arrow-top-right-on-square" class="w-4 h-4" />
+                View Contract
+              </UButton>
+            </div>
           </template>
           
           <form @submit.prevent="submitNote" class="space-y-4">
@@ -167,7 +180,7 @@
         </UCard>
 
         <div v-if="isLoading" class="flex items-center justify-center py-8">
-          <ULoadingIcon />
+          <Loader :loading="isLoading" />
         </div>
 
         <div v-else-if="userNotes.length > 0" class="space-y-4">
